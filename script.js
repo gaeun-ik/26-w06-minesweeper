@@ -154,7 +154,7 @@ function revealSafeCells(row, column) {
   while (queue.length > 0) {
     const [currentRow, currentColumn] = queue.shift();
     const cell = board[currentRow][currentColumn];
-    if (cell.isRevealed || cell.isFlagged || cell.isMine) continue;
+    if (cell.isRevealed || cell.markState === 1 || cell.isMine) continue;
 
     cell.isRevealed = true;
     revealedCount += 1;
@@ -163,7 +163,7 @@ function revealSafeCells(row, column) {
     if (cell.adjacentMines === 0) {
       for (const [neighborRow, neighborColumn] of getNeighbors(currentRow, currentColumn)) {
         const neighbor = board[neighborRow][neighborColumn];
-        if (!neighbor.isRevealed && !neighbor.isFlagged && !neighbor.isMine) {
+        if (!neighbor.isRevealed && neighbor.markState !== 1 && !neighbor.isMine) {
           queue.push([neighborRow, neighborColumn]);
         }
       }

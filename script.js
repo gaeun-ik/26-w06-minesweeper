@@ -15,6 +15,7 @@ let flagsPlaced = 0;
 let revealedCount = 0;
 let gameStarted = false;
 let gameOver = false;
+let gameWon = false;
 let elapsedSeconds = 0;
 let timerInterval = null;
 
@@ -23,7 +24,7 @@ function createBoard() {
     Array.from({ length: COLUMNS }, () => ({
       isMine: false,
       isRevealed: false,
-      isFlagged: false,
+      markState: 0,
       adjacentMines: 0,
       element: null,
     })),
@@ -56,7 +57,9 @@ function placeMines(safeRow, safeColumn) {
   const candidates = [];
   for (let row = 0; row < ROWS; row += 1) {
     for (let column = 0; column < COLUMNS; column += 1) {
-      if (row !== safeRow || column !== safeColumn) {
+      const isInFirstClickSafeZone =
+        Math.abs(row - safeRow) <= 1 && Math.abs(column - safeColumn) <= 1;
+      if (!isInFirstClickSafeZone) {
         candidates.push([row, column]);
       }
     }
@@ -103,12 +106,19 @@ function getNeighbors(row, column) {
 function startTimer() {
   if (timerInterval !== null) return;
   timerInterval = window.setInterval(() => {
-    elapsedSeconds += 1;
+    elapsedSeconds = Math.min(elapsedSeconds + 1, 999);
     timerElement.textContent = formatCounter(elapsedSeconds);
+    if (elapsedSeconds === 999) {
+      window.clearInterval(timerInterval);
+      timerInterval = null;
+    }
   }, 1000);
 }
 
 function formatCounter(value) {
+  if (value < 0) {
+    return `-${String(Math.abs(value)).padStart(2, "0")}`;
+  }
   return String(Math.min(value, 999)).padStart(3, "0");
 }
 
@@ -118,7 +128,7 @@ function updateMineCounter() {
 
 function revealCell(row, column) {
   const cell = board[row][column];
-  if (gameOver || cell.isRevealed || cell.isFlagged) return;
+  if (gameOver || cell.isRevealed || cell.markState === 1) return;
 
   if (!gameStarted) {
     gameStarted = true;
@@ -165,8 +175,15 @@ function toggleFlag(row, column) {
   const cell = board[row][column];
   if (gameOver || cell.isRevealed) return;
 
-  cell.isFlagged = !cell.isFlagged;
-  flagsPlaced += cell.isFlagged ? 1 : -1;
+  if (cell.markState === 0) {
+    cell.markState = 1;
+    flagsPlaced += 1;
+  } else if (cell.markState === 1) {
+    cell.markState = 2;
+    flagsPlaced -= 1;
+  } else {
+    cell.markState = 0;
+  }
   renderCell(row, column);
   updateMineCounter();
 }
@@ -175,12 +192,16 @@ function renderCell(row, column, exploded = false) {
   const cell = board[row][column];
   const element = cell.element;
   element.classList.toggle("cell--revealed", cell.isRevealed);
-  element.classList.toggle("cell--flagged", cell.isFlagged);
+  element.classList.toggle("cell--flagged", cell.markState === 1);
+  element.classList.toggle("cell--question", cell.markState === 2);
   element.classList.toggle("cell--exploded", exploded);
 
-  if (cell.isFlagged && !cell.isRevealed) {
+  if (cell.markState === 1 && !cell.isRevealed) {
     element.textContent = "🚩";
     element.setAttribute("aria-label", `행 ${row + 1}, 칸 ${column + 1}, 깃발`);
+  } else if (cell.markState === 2 && !cell.isRevealed) {
+    element.textContent = "?";
+    element.setAttribute("aria-label", `행 ${row + 1}, 칸 ${column + 1}, 물음표`);
   } else if (cell.isRevealed && cell.isMine) {
     element.textContent = "💣";
     element.setAttribute("aria-label", `행 ${row + 1}, 칸 ${column + 1}, 지뢰`);
@@ -202,6 +223,7 @@ function renderCell(row, column, exploded = false) {
 
 function finishGame(won, explodedPosition = null) {
   gameOver = true;
+  gameWon = won;
   window.clearInterval(timerInterval);
   timerInterval = null;
 
@@ -224,7 +246,7 @@ function finishGame(won, explodedPosition = null) {
       if (cell.isMine) {
         cell.isRevealed = true;
         renderCell(row, column, exploded);
-      } else if (!won && cell.isFlagged) {
+      } else if (!won && cell.markState === 1) {
         cell.element.classList.add("cell--wrong-flag");
         cell.element.textContent = "✕";
         cell.element.setAttribute("aria-label", `행 ${row + 1}, 칸 ${column + 1}, 잘못 꽂은 깃발`);
@@ -240,12 +262,32 @@ function resetGame() {
   revealedCount = 0;
   gameStarted = false;
   gameOver = false;
+  gameWon = false;
   elapsedSeconds = 0;
   timerElement.textContent = "000";
-  resetFaceElement.textContent = "🙂";
+  resetFaceElement.textContent = "😊";
   statusElement.textContent = "칸을 열어 게임을 시작하세요.";
   createBoard();
 }
 
+function showPressedFace() {
+  resetFaceElement.textContent = "😮";
+}
+
+function showDefaultFace() {
+  resetFaceElement.textContent = gameOver ? (gameWon ? "😎" : "😵") : "😊";
+}
+
 resetButton.addEventListener("click", resetGame);
+resetButton.addEventListener("pointerdown", showPressedFace);
+resetButton.addEventListener("pointerup", showDefaultFace);
+resetButton.addEventListener("pointercancel", showDefaultFace);
+resetButton.addEventListener("pointerleave", showDefaultFace);
+resetButton.addEventListener("blur", showDefaultFace);
+resetButton.addEventListener("keydown", (event) => {
+  if (event.key === "Enter" || event.key === " ") {
+    showPressedFace();
+  }
+});
+resetButton.addEventListener("keyup", showDefaultFace);
 createBoard();

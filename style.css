@@ -224,6 +224,11 @@ h1 span {
   background: #e9f0e4;
 }
 
+.cell--question {
+  background: #f3efe1;
+  color: #a27b38;
+}
+
 .cell--mine {
   background: #f3d9d2;
   box-shadow: inset 0 0 0 1px #edc6bc;

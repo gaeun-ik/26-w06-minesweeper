@@ -1,21 +1,26 @@
 "use strict";
 
-const ROWS = 9;
-const COLUMNS = 9;
-const MINE_COUNT = 10;
+const DIFFICULTIES = {
+  beginner: { label: "초급", rows: 9, columns: 9, mines: 10 },
+  intermediate: { label: "중급", rows: 16, columns: 16, mines: 40 },
+  expert: { label: "상급", rows: 16, columns: 30, mines: 99 },
+};
 const boardElement = document.querySelector("#board");
 const mineCounterElement = document.querySelector("#mine-counter");
 const timerElement = document.querySelector("#timer");
 const statusElement = document.querySelector("#game-status");
 const resetButton = document.querySelector("#reset-button");
-const resetFaceElement = document.querySelector("#reset-face");
+const difficultySelect = document.querySelector("#difficulty");
 
+let ROWS;
+let COLUMNS;
+let MINE_COUNT;
+let currentDifficulty = DIFFICULTIES[difficultySelect.value];
 let board = [];
 let flagsPlaced = 0;
 let revealedCount = 0;
 let gameStarted = false;
 let gameOver = false;
-let gameWon = false;
 let elapsedSeconds = 0;
 let timerInterval = null;
 
@@ -31,6 +36,11 @@ function createBoard() {
   );
 
   boardElement.replaceChildren();
+  boardElement.style.gridTemplateColumns = `repeat(${COLUMNS}, var(--cell-size))`;
+  boardElement.setAttribute(
+    "aria-label",
+    `${currentDifficulty.label} ${ROWS}행 ${COLUMNS}열 지뢰찾기 보드`,
+  );
   for (let row = 0; row < ROWS; row += 1) {
     for (let column = 0; column < COLUMNS; column += 1) {
       const cell = document.createElement("button");
@@ -194,6 +204,7 @@ function renderCell(row, column, exploded = false) {
   element.classList.toggle("cell--revealed", cell.isRevealed);
   element.classList.toggle("cell--flagged", cell.markState === 1);
   element.classList.toggle("cell--question", cell.markState === 2);
+  element.classList.toggle("cell--mine", cell.isRevealed && cell.isMine);
   element.classList.toggle("cell--exploded", exploded);
 
   if (cell.markState === 1 && !cell.isRevealed) {
@@ -223,16 +234,13 @@ function renderCell(row, column, exploded = false) {
 
 function finishGame(won, explodedPosition = null) {
   gameOver = true;
-  gameWon = won;
   window.clearInterval(timerInterval);
   timerInterval = null;
 
   if (won) {
     statusElement.textContent = `성공! ${elapsedSeconds}초 만에 모든 안전한 칸을 열었어요.`;
-    resetFaceElement.textContent = "😎";
   } else {
     statusElement.textContent = "지뢰를 밟았어요. 새 게임으로 다시 도전해보세요.";
-    resetFaceElement.textContent = "😵";
   }
 
   for (let row = 0; row < ROWS; row += 1) {
@@ -262,32 +270,21 @@ function resetGame() {
   revealedCount = 0;
   gameStarted = false;
   gameOver = false;
-  gameWon = false;
   elapsedSeconds = 0;
   timerElement.textContent = "000";
-  resetFaceElement.textContent = "😊";
-  statusElement.textContent = "칸을 열어 게임을 시작하세요.";
+  statusElement.textContent = `${currentDifficulty.label} · ${ROWS} × ${COLUMNS} · 지뢰 ${MINE_COUNT}개`;
   createBoard();
 }
 
-function showPressedFace() {
-  resetFaceElement.textContent = "😮";
-}
-
-function showDefaultFace() {
-  resetFaceElement.textContent = gameOver ? (gameWon ? "😎" : "😵") : "😊";
+function changeDifficulty() {
+  currentDifficulty = DIFFICULTIES[difficultySelect.value];
+  ROWS = currentDifficulty.rows;
+  COLUMNS = currentDifficulty.columns;
+  MINE_COUNT = currentDifficulty.mines;
+  resetGame();
 }
 
 resetButton.addEventListener("click", resetGame);
-resetButton.addEventListener("pointerdown", showPressedFace);
-resetButton.addEventListener("pointerup", showDefaultFace);
-resetButton.addEventListener("pointercancel", showDefaultFace);
-resetButton.addEventListener("pointerleave", showDefaultFace);
-resetButton.addEventListener("blur", showDefaultFace);
-resetButton.addEventListener("keydown", (event) => {
-  if (event.key === "Enter" || event.key === " ") {
-    showPressedFace();
-  }
-});
-resetButton.addEventListener("keyup", showDefaultFace);
-createBoard();
+resetButton.setAttribute("aria-label", "새 게임 시작");
+difficultySelect.addEventListener("change", changeDifficulty);
+changeDifficulty();
